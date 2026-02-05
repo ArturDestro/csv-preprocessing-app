@@ -1,0 +1,17 @@
+{
+  "order": [
+    "loader",
+    "cleaner"
+  ],
+  "loader": {
+    "type": "csv",
+    "separator": ",",
+    "path": "jobs\\26d5427c-4deb-4fb6-8c89-f716487b1c5c\\input.csv"
+  },
+  "cleaner": {
+    "type": "mean",
+    "columns": [
+      "age"
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "order": [
+    "loader",
+    "cleaner",
+    "encoder",
+    "scaler"
+  ],
+  "loader": {
+    "type": "csv",
+    "separator": ",",
+    "path": "jobs\\84759972-b3ee-4282-aa0e-1668b0c4d069\\input.csv"
+  },
+  "cleaner": {
+    "strategy": "mean",
+    "columns": null
+  },
+  "encoder": {
+    "type": "onehot",
+    "columns": null
+  },
+  "scaler": {
+    "type": "standard",
+    "columns": null
+  }
+}

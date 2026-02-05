@@ -1,0 +1,15 @@
+pd.read_csv(path, econding, delimiter)
+
+df.info() #colunas, not-null, dtype
+
+df.desbribe() #estatiticas de cada coluna numerica
+
+df.empty() #boolean
+
+df.select_dtypes(include="") #colunas de um tipo
+
+df.index #retorna identificadores das linhas e dtype
+
+df.columns #retorna identificadores das colunas e dtype
+
+pd.get_dummies(df) #retorn one_hot (de tudo ? dos categoricos ?)

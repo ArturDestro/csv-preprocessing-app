@@ -1,0 +1,9 @@
+id,idade,salario,cidade,formacao,experiencia_anos
+1,25.0,2500.0,Sao Paulo,Graduacao,2
+2,32.0,4800.0,Rio de Janeiro,Pos-graduacao,8
+3,,3200.0,Sao Paulo,Graduacao,5
+4,45.0,12000.0,Belo Horizonte,Mestrado,20
+5,29.0,,Curitiba,Graduacao,4
+6,38.0,7000.0,,Doutorado,12
+7,22.0,1800.0,Curitiba,,1
+8,50.0,15000.0,Rio de Janeiro,Mestrado,25

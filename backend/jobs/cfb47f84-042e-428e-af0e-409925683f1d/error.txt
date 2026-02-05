@@ -1,0 +1,10 @@
+Loader inválido: None
+
+Traceback (most recent call last):
+  File "E:\FERIAS\SaaS\src\backend\worker.py", line 29, in process_csv
+    df = pipeline.run()
+  File "E:\FERIAS\SaaS\src\backend\engine\pipeline.py", line 21, in run
+    loader = LoaderFactory.create(step_config)
+  File "E:\FERIAS\SaaS\src\backend\engine\Loader\loaderFactory.py", line 11, in create
+    raise ValueError(f"Loader inválido: {loader_type}")
+ValueError: Loader inválido: None

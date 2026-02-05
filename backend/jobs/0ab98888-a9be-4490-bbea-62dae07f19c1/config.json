@@ -1,0 +1,25 @@
+{
+  "order": [
+    "loader",
+    "cleaner",
+    "encoder",
+    "scaler"
+  ],
+  "loader": {
+    "type": "csv",
+    "separator": ",",
+    "path": "jobs\\0ab98888-a9be-4490-bbea-62dae07f19c1\\input.csv"
+  },
+  "cleaner": {
+    "type": "median",
+    "columns": null
+  },
+  "encoder": {
+    "type": "label",
+    "columns": null
+  },
+  "scaler": {
+    "type": "standard",
+    "columns": null
+  }
+}

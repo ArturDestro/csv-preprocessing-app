@@ -1,0 +1,17 @@
+{
+  "order": [
+    "loader",
+    "scaler"
+  ],
+  "cleaner": {
+    "type": "csv",
+    "separator": ","
+  },
+  "scaler": {
+    "type": "mean",
+    "columns": null
+  },
+  "loader": {
+    "path": "jobs\\cfb47f84-042e-428e-af0e-409925683f1d\\input.csv"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "order": [
+    "loader"
+  ],
+  "loader": {
+    "type": "csv",
+    "separator": ",",
+    "path": "jobs\\bf749ce8-e20d-4190-81b2-11cb97e4731c\\input.csv"
+  }
+}

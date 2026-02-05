@@ -1,0 +1,10 @@
+Scaler 'mean' não suportado
+
+Traceback (most recent call last):
+  File "E:\FERIAS\SaaS\src\backend\worker.py", line 29, in process_csv
+    df = pipeline.run()
+  File "E:\FERIAS\SaaS\src\backend\engine\pipeline.py", line 41, in run
+    scaler = ScalerFactory.create(step_config)
+  File "E:\FERIAS\SaaS\src\backend\engine\Scaler\scalerFactory.py", line 17, in create
+    raise ValueError(f"Scaler '{scaler_type}' não suportado")
+ValueError: Scaler 'mean' não suportado

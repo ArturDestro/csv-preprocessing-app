@@ -1,0 +1,20 @@
+data type 'numeric' not understood
+
+Traceback (most recent call last):
+  File "E:\FERIAS\SaaS\src\backend\worker.py", line 29, in process_csv
+    df = pipeline.run()
+  File "E:\FERIAS\SaaS\src\backend\engine\pipeline.py", line 28, in run
+    cleaner.fit(df)
+    ~~~~~~~~~~~^^^^
+  File "E:\FERIAS\SaaS\src\backend\engine\Cleaner\cleaner.py", line 47, in fit
+    self.columns = df.select_dtypes(include="numeric").columns
+                   ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\artur\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\frame.py", line 5067, in select_dtypes
+    include = check_int_infer_dtype(include)
+  File "C:\Users\artur\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\frame.py", line 5064, in check_int_infer_dtype
+    converted_dtypes.append(infer_dtype_from_object(dtype))
+                            ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\artur\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\dtypes\common.py", line 1552, in infer_dtype_from_object
+    return infer_dtype_from_object(np.dtype(dtype))
+                                   ~~~~~~~~^^^^^^^
+TypeError: data type 'numeric' not understood

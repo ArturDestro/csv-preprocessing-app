@@ -1,0 +1,12 @@
+file is not tabular
+
+Traceback (most recent call last):
+  File "E:\ferias\saas\src\backend\worker.py", line 35, in process_csv
+    df = pipeline.run()
+         ^^^^^^^^^^^^^^
+  File "E:\ferias\saas\src\backend\engine\pipeline.py", line 22, in run
+    df = loader.load()
+         ^^^^^^^^^^^^^
+  File "E:\ferias\saas\src\backend\engine\Loader\csv_loader.py", line 43, in load
+    raise ValueError("file is not tabular")
+ValueError: file is not tabular

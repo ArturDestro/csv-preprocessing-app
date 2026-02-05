@@ -1,0 +1,13 @@
+'type'
+
+Traceback (most recent call last):
+  File "E:\FERIAS\SaaS\src\backend\worker.py", line 29, in process_csv
+    df = pipeline.run()
+         ^^^^^^^^^^^^^^
+  File "E:\FERIAS\SaaS\src\backend\engine\pipeline.py", line 27, in run
+    cleaner = CleanerFactory.create(step_config)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\FERIAS\SaaS\src\backend\engine\Cleaner\cleanerFactory.py", line 6, in create
+    cleaner_type = config["type"]
+                   ~~~~~~^^^^^^^^
+KeyError: 'type'
