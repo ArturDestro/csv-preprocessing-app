@@ -1,269 +1,141 @@
-# CSV Processing SaaS — README (versão 1.0)
+# CSV Processing App — README (versão 1.0)
 
-**Status:** v1.0 — Lançamento inicial
-
----
-
-## Visão geral
-
-Aplicação web para processamento de arquivos CSV: upload, validação, pré-processamento, execução de jobs de transformação/análise e download do resultado. Pensada como um *SaaS* simples (prova de conceito / MVP) com frontend em **Next.js** e backend em **FastAPI**, suporte a jobs de processamento em background e armazenamento local ou S3.
+**Status:** v1.0
 
 ---
 
-## Funcionalidades principais
+## Visão geral (curto e direto)
 
-* Upload de arquivos CSV via UI e API
-* Validação de formato e esquema (colunas obrigatórias, tipos básicos)
-* Pipeline de pré-processamento (limpeza, normalização, remoção de duplicatas)
-* Execução de jobs assíncronos (fila) com status (pendente, em andamento, concluído, falha)
-* Download do resultado processado (CSV/ZIP)
-* Histórico mínimo de jobs por usuário (MVP)
-* Healthcheck e logs básicos
+Este repositório contém o **backend** de um processador de CSVs em Python. Não há frontend incluído. O serviço principal oferece:
 
----
+* endpoint para **upload** de um CSV e criação de um *job*;
+* enfileiramento do job em **Redis**;
+* um **worker** que consome a fila (blpop) e processa o CSV usando a *engine* interna;
+* pipeline modular (Loader, Scaler, Encoder, Cleaner, etc.) que lê `input.csv` e grava `output.csv` na pasta do job.
 
-## Stack tecnológicos (sugestão / implementação típica)
-
-* Frontend: **Next.js** (React) + Tailwind + TypeScript (ou JavaScript)
-* Backend: **FastAPI** (Python 3.10+) com **Uvicorn**
-* Fila (opcional para produção): **Redis** + **Celery** ou **RQ**
-* Banco (opcional): **PostgreSQL** (ou SQLite para desenvolvimento)
-* Armazenamento: sistema de arquivos local (dev) ou **Amazon S3** (produção)
-* Containerização: Docker & Docker Compose
+Código relevante: `src/backend/` (arquivos principais: `main.py`, `worker.py`, `job_utils.py` e a pasta `engine/`).
 
 ---
 
-## Pré-requisitos
+## Estrutura mínima importante (apenas arquivos do projeto, sem o .venv)
 
-* Node.js (v16+ / v18+ recomendado)
-* pnpm ou npm
-* Python 3.10+
-* pip (ou poetry/poetry)
-* (opcional) Docker, Docker Compose
-* (opcional) Redis, PostgreSQL para execução completa
+```
+src/backend/
+├─ main.py           # FastAPI - endpoints
+├─ worker.py         # loop do worker (redis.blpop) + process_csv
+├─ job_utils.py      # util para criar pasta de job
+├─ jobs/             # exemplo/artefatos de jobs (input.csv / output.csv)
+└─ engine/           # pipeline e componentes (Loader, Scaler, Encoder, ...)
+```
+
+> Observação: o repositório que você enviou contém um diretório `.venv/` dentro de `src/backend/`. Recomendo remover o virtualenv do repositório (adicionar no `.gitignore`) e manter apenas um `requirements.txt` ou `pyproject.toml`.
 
 ---
 
-## Estrutura sugerida do repositório
+## Dependências (apontamento prático)
 
-```
-/ (repo root)
-├─ backend/                # FastAPI app
-│  ├─ app/
-│  │  ├─ main.py
-│  │  ├─ api/
-│  │  ├─ services/
-│  │  └─ workers/
-│  ├─ requirements.txt
-│  └─ Dockerfile
-├─ frontend/               # Next.js app
-│  ├─ package.json
-│  └─ src/
-├─ docker-compose.yml
-└─ README_v1.0.md
-```
+O código usa (observado nos imports):
 
-> Ajuste conforme seu layout real (seu projeto pode ter `src/` na raiz — adeque comandos abaixo ao caminho correto).
+* `fastapi` (API)
+* `uvicorn` (server ASGI)
+* `redis` (cliente Redis)
+* `rq` (importado em `main.py`, mas note: o enfileiramento atual usa `redis_conn.rpush` e o worker usa `blpop` — `rq` não é realmente necessário a menos que você opte por usar a biblioteca RQ)
+* `pandas`, `numpy` (manipulação de CSV / tabelas)
+* `chardet` (detecção de encoding)
 
----
-
-## Variáveis de ambiente (exemplos)
-
-Configure as variáveis necessárias no backend (arquivo `.env`):
-
-```
-# Backend
-APP_ENV=development
-SECRET_KEY=uma_senha_segura
-DATABASE_URL=postgresql://user:pass@localhost:5432/dbname  # opcional
-STORAGE_TYPE=local   # local | s3
-STORAGE_PATH=./storage
-AWS_S3_BUCKET=meu-bucket
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
-REDIS_URL=redis://localhost:6379/0   # se usar fila
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-```
-
-No frontend, variáveis públicas (ex: NEXT_PUBLIC_API_BASE_URL):
-
-```
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
-```
-
----
-
-## Instalação e execução (desenvolvimento)
-
-### Backend (FastAPI)
-
-1. Entre na pasta do backend:
-
-```bash
-cd backend
-```
-
-2. Crie e ative um ambiente virtual:
+Exemplo rápido para instalar (sugestão):
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # macOS / Linux
-.venv\Scripts\activate     # Windows PowerShell
+source .venv/bin/activate       # ou .venv\Scripts\activate no Windows
+pip install fastapi uvicorn redis rq pandas numpy chardet
 ```
 
-3. Instale dependências:
+Você também pode gerar um `requirements.txt` com:
 
 ```bash
-pip install -r requirements.txt
+pip freeze > requirements.txt
 ```
-
-4. Execute a aplicação (Uvicorn):
-
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-A API ficará disponível em `http://localhost:8000` e a documentação automática em `http://localhost:8000/docs` (Swagger) ou `/redoc`.
-
-Se usar Celery para jobs em background, rode também o worker:
-
-```bash
-celery -A app.workers.celery_app worker --loglevel=info
-```
-
-### Frontend (Next.js)
-
-1. Entre na pasta do frontend:
-
-```bash
-cd frontend
-```
-
-2. Instale dependências e rode em modo dev:
-
-```bash
-# com pnpm
-pnpm install
-pnpm dev
-
-# ou com npm
-npm install
-npm run dev
-```
-
-A UI estará em `http://localhost:3000`.
 
 ---
 
-## Execução via Docker (exemplo rápido)
+## Como rodar (modo desenvolvimento)
 
-Um `docker-compose.yml` básico pode orquestrar backend, frontend, Redis e Postgres. Exemplo de comando:
+1. Abra um terminal e vá para a pasta do backend:
 
 ```bash
-# na raiz do repo
-docker compose up --build
+cd src/backend
 ```
 
-Ajuste serviços, volumes e variáveis conforme necessidade.
+2. Crie e ative o venv e instale dependências (veja seção anterior).
+
+3. Rode o servidor FastAPI (API):
+
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+> Observação: `main.py` importa `job_utils` e lê/escreve em `jobs/<job_id>/`, por isso execute o comando a partir de `src/backend`.
+
+4. Rode o worker (consumidor da fila):
+
+```bash
+python worker.py
+```
+
+O `worker.py` faz um `blpop` na lista Redis chamada `csv_jobs` e chama `process_csv(job_id)`.
+
+5. Certifique-se de ter uma instância Redis rodando em `localhost:6379` (config hard-coded no código).
 
 ---
 
-## API (endpoints principais - exemplos)
+## Endpoints da API (implementados)
 
-* `POST /api/upload` — upload do CSV (multipart/form-data)
-* `POST /api/jobs` — criar job de processamento (referenciando arquivo upload)
-* `GET /api/jobs/{job_id}` — status e logs do job
-* `GET /api/download/{file_id}` — download do resultado
-* `GET /health` — healthcheck
+* `GET /ping` — simples healthcheck retornando `{"message":"pong"}`.
+* `POST /upload` — recebe multipart/form-data com campo `file` (o CSV).
 
-### Exemplo rápido (curl)
+  * Cria `jobs/<job_id>/` e grava `input.csv` lá.
+  * Define `job:{job_id}:status` = `queued` no Redis e faz `rpush(QUEUE, json(job))` para enfileirar.
+  * Retorna `{"job_id": "<uuid>", "status": "queued"}`.
+* `GET /jobs/{job_id}` — retorna o status (`queued`, `processing`, `finished`, etc.) lido em `job:{job_id}:status` no Redis.
+* `GET /download_csv/{job_id}` — baixa `jobs/<job_id>/output.csv` se o status for `finished`.
+
+### Exemplo (curl)
 
 ```bash
 # upload
-curl -F "file=@meuarquivo.csv" http://localhost:8000/api/upload
-
-# criar job (JSON com parâmetros do pipeline)
-curl -X POST -H "Content-Type: application/json" -d '{"file_id":"<id>", "pipeline": ["clean","normalize"]}' http://localhost:8000/api/jobs
+curl -F "file=@meuarquivo.csv" http://localhost:8000/upload
 
 # checar status
-curl http://localhost:8000/api/jobs/<job_id>
+curl http://localhost:8000/jobs/<job_id>
+
+# baixar resultado (quando status == finished)
+curl -O http://localhost:8000/download_csv/<job_id>
 ```
 
 ---
 
-## Testes
+## Engine (onde acontece o processamento)
 
-* Backend: `pytest` (adicionar testes unitários e de integração)
-* Frontend: testar componentes com `Jest` + `React Testing Library` (opcional)
+Local: `src/backend/engine/`
 
-Exemplo (backend):
+Principais componentes observados:
 
-```bash
-cd backend
-pytest
-```
+* `Loader` (CSVLoader) — lê CSV, detecta separador e encoding quando não fornecidos (usa `chardet`).
+* `Scaler` — implementa `standard`, `minmax`, `robust` (fit / transform sobre colunas selecionadas).
+* `Encoder` — `onehot`, `ordinal`, `label`.
+* `Pipeline` — recebe um `config` dict com ordem (`order`) e opções por etapa; aplica loader -> cleaners -> encoders -> scalers -> etc. e retorna um `DataFrame` final.
 
----
+> Observação: parte do `worker.py` e `main.py` contém código direto de enfileiramento/usos de Redis. Verifique exatamente como o `config` do pipeline é criado (no repositório enviado há exemplos de `input.csv` e `output.csv` em `jobs/`).
 
-## Logs e observabilidade
-
-* Para desenvolvimento, use logs no console (`uvicorn` e `celery`) e arquivos de log rotacionados.
-* Em produção, envie logs para um agregador (Elastic, Datadog, Loggly) e use metrics (Prometheus + Grafana) se possível.
 
 ---
 
-## Segurança
 
-* Não exponha secrets no repositório. Use arquivos `.env` locais e variáveis de ambiente no deploy.
-* Valide esquema/colunas e limites de tamanho do arquivo para evitar DoS.
-* Considere autenticação (JWT / OAuth) se houver usuários.
-
----
-
-## Limitações conhecidas (v1.0)
-
-* Autenticação e controle de acesso mínimos ou inexistentes
-* Escalabilidade limitada (fila + storage precisam ser configurados para produção)
-* Padronização de esquemas CSV depende de configuração manual
-
----
-
-## Roadmap (próximos passos sugeridos)
-
-* Autenticação por conta de usuário + planos por assinatura
-* Upload em chunk para arquivos grandes
-* Integração com S3 e limpeza automática de arquivos antigos
-* Dashboard com histórico e métricas de uso
-* Webhooks / callbacks quando job finalizar
-
----
-
-## Como contribuir
-
-1. Fork do repositório
-2. Crie branch `feature/my-feature`
-3. Faça commits atômicos e descriptivos
-4. Abra PR descrevendo a mudança
-
----
-
-## Licença
-
-MIT — veja o arquivo `LICENSE`.
-
----
-
-## Contato
-
-Para dúvidas ou suporte: `seu-email@exemplo.com` (substitua pelo contato real do projeto).
-
----
 
 ## Changelog (v1.0)
 
-* Versão inicial (MVP) — upload, validação, processamento em background e download de resultados.
 
 ---
 
-> *Observação:* este README foi criado como **versão 1.0** genérica para um app de processamento de CSV com Next.js (frontend) e FastAPI (backend). Se seu projeto tiver uma estrutura ou stack diferente (por exemplo Django, SQLite, ou sem fila), me diga que eu adapto o README para ser exato ao seu repositório.
+
