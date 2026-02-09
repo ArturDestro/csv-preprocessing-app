@@ -1,6 +1,6 @@
 # CSV Processing App — README (versão 1.0)
 
-**Status:** v1.0 — descrição fiel ao código presente (backend apenas).
+**Status:** v1.0
 
 ---
 
@@ -26,19 +26,14 @@ Código relevante:
 
 ---
 
-## Estrutura mínima importante (apenas arquivos do projeto, sem o .venv)
+## Estrutura
 
 **Frontend (Next.js)**
 
 O frontend está em `src/frontend/`. Observações gerais (baseadas na estrutura enviada):
 
-* Stack: **Next.js (React)** — o projeto roda como uma app Next, podendo estar em JavaScript ou TypeScript conforme `package.json`.
+* Stack: **Next.js (React)** — o projeto roda como uma app Next.
 * Funções principais da UI: upload de CSV, acompanhamento do status do job (polling ou WebSocket) e download do `output.csv` quando o job terminar.
-* Scripts comuns (verifique `package.json` em `src/frontend/`):
-
-  * `pnpm dev` / `npm run dev` — roda em modo desenvolvimento (hot-reload).
-  * `pnpm build` / `npm run build` — build para produção.
-  * `pnpm start` / `npm start` — serve a build em produção.
 * Configuração/API: o frontend deve apontar para o backend — verifique `NEXT_PUBLIC_API_BASE_URL` ou uso de proxies (`next.config.js`). As chamadas esperadas ao backend são:
 
   * `POST /upload` para enviar o CSV (multipart/form-data)
@@ -49,7 +44,7 @@ O frontend está em `src/frontend/`. Observações gerais (baseadas na estrutura
 **Como rodar o frontend (dev)**
 
 ```bash
-cd src/frontend
+cd src/csv-preprocessing-app
 # instalar dependências
 pnpm install   # ou npm install
 # rodar em dev
@@ -91,13 +86,6 @@ python -m venv .venv
 source .venv/bin/activate       # ou .venv\Scripts\activate no Windows
 pip install fastapi uvicorn redis rq pandas numpy chardet
 ```
-
-Você também pode gerar um `requirements.txt` com:
-
-```bash
-pip freeze > requirements.txt
-```
-
 ---
 
 ## Como rodar (modo desenvolvimento)
@@ -160,56 +148,22 @@ curl -O http://localhost:8000/download_csv/<job_id>
 
 Local: `src/backend/engine/`
 
-Principais componentes observados:
+Principais componentes:
 
 * `Loader` (CSVLoader) — lê CSV, detecta separador e encoding quando não fornecidos (usa `chardet`).
 * `Scaler` — implementa `standard`, `minmax`, `robust` (fit / transform sobre colunas selecionadas).
 * `Encoder` — `onehot`, `ordinal`, `label`.
 * `Pipeline` — recebe um `config` dict com ordem (`order`) e opções por etapa; aplica loader -> cleaners -> encoders -> scalers -> etc. e retorna um `DataFrame` final.
 
-O `worker.process_csv` constrói/define (ou deveria definir) um `config` onde o `loader.path` é `jobs/<job_id>/input.csv`, chama `Pipeline(config).run()` e grava `output.csv` na pasta do job.
-
-> Observação: parte do `worker.py` e `main.py` contém código direto de enfileiramento/usos de Redis. Verifique exatamente como o `config` do pipeline é criado (no repositório enviado há exemplos de `input.csv` e `output.csv` em `jobs/`).
-
----
-
-## Observações / problemas encontrados (curto e objetivo)
-
-1. **Virtualenv dentro do repositório** (`src/backend/.venv/`) — remover e adicionar `.venv/` ao `.gitignore`.
-2. **Sem `requirements.txt`/`pyproject.toml`** visível — adicione para facilitar instalação reproduzível.
-3. `main.py` importa `rq.Queue` mas o fluxo atual usa `redis_conn.rpush` + `blpop` no worker — existe uma inconsistência (ou sobra import). Escolha entre usar `rq`/`RQ` ou usar fila manual via listas Redis; hoje o código usa a lista Redis manualmente.
-4. `worker.py` possui `while True: blpop` — ok para POC, mas em produção prefira workers gerenciados (systemd, supervisor, containers) e tratamento de falhas/retries/logs.
-5. Segurança: endpoints sem autenticação — se for expor, adicione autenticação/limitação de tamanho de upload, validação de esquema CSV.
-
----
-
-## Melhorias / roadmap sugerido (rápido)
-
-* Remover `.venv` e adicionar `requirements.txt`.
-* Padronizar enfileiramento: use `rq`/`celery` (com Redis) ou mantenha a lista Redis manual, mas remova imports obsoletos.
-* Adicionar testes unitários para `engine/` (pandas workflows).
-* Adicionar `docker-compose` com `backend` + `redis` para facilitar o desenvolvimento.
-* Expor logs e métricas básicas (arquivo de log, ou endpoint `/metrics`).
-
----
-
-## Como eu posso ajudar agora
-
-Escolha uma das opções e eu faço na hora:
-
-1. Gerar um `requirements.txt` preciso a partir dos imports detectados.
-2. Remover `.venv` e criar um `.gitignore` e `docker-compose.yml` (backend + redis).
-3. Substituir o `rpush`/`blpop` por uma implementação com `rq` ou `celery` (faço a alteração no código).
-4. Gerar um `README.md` final pronto para the repo (versão curta e a versão técnica de desenvolvimento).
-
-Diz qual você quer que eu faça agora e eu executo direto no repositório que você subiu.
-
 ---
 
 ## Changelog (v1.0)
 
-* README inicializado com descrição fiel ao código encontrado em `src/backend`.
+### v1.0
+- Primeira versão funcional do app
+- Upload de arquivos CSV pelo frontend
+- Processamento assíncrono via backend
+- Download do CSV processado
 
 ---
 
-> Nota: este README foi escrito diretamente do conteúdo do zip `src.zip` que você enviou. Se quiser, eu já aplico as mudanças no repositório (ex: criar `requirements.txt`, `.gitignore` e `docker-compose.yml`) — só me diga qual das opções acima prefere.
