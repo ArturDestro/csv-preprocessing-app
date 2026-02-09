@@ -1,0 +1,6 @@
+# Backend runtime / jobs
+backend/jobs/
+
+# Node
+node_modules/
+package-lock.json
