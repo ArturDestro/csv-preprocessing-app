@@ -1,19 +1,28 @@
 # CSV Processing App — README (versão 1.0)
 
-**Status:** v1.0
+**Status:** v1.0 — descrição fiel ao código presente (backend apenas).
 
 ---
 
 ## Visão geral (curto e direto)
 
-Este repositório contém o **backend** de um processador de CSVs em Python. Não há frontend incluído. O serviço principal oferece:
+Este repositório contém **frontend e backend** de um processador de arquivos CSV.
 
-* endpoint para **upload** de um CSV e criação de um *job*;
-* enfileiramento do job em **Redis**;
-* um **worker** que consome a fila (blpop) e processa o CSV usando a *engine* interna;
-* pipeline modular (Loader, Scaler, Encoder, Cleaner, etc.) que lê `input.csv` e grava `output.csv` na pasta do job.
+* **Frontend**: aplicação web (Next.js / React) responsável por upload do CSV, acompanhamento do status do job e download do resultado.
+* **Backend**: API em FastAPI que recebe uploads, cria *jobs*, enfileira no Redis e processa os CSVs via um worker dedicado.
 
-Código relevante: `src/backend/` (arquivos principais: `main.py`, `worker.py`, `job_utils.py` e a pasta `engine/`).
+Fluxo geral:
+
+1. Usuário faz upload do CSV pela interface web.
+2. Frontend chama a API (`/upload`) e recebe um `job_id`.
+3. Backend enfileira o job no Redis.
+4. Worker consome a fila, executa o pipeline de processamento e gera `output.csv`.
+5. Frontend consulta o status e libera o download quando o job finaliza.
+
+Código relevante:
+
+* Frontend: `src/frontend/`
+* Backend: `src/backend/` (arquivos principais: `main.py`, `worker.py`, `job_utils.py`, `engine/`).
 
 ---
 
@@ -126,16 +135,49 @@ Principais componentes observados:
 * `Encoder` — `onehot`, `ordinal`, `label`.
 * `Pipeline` — recebe um `config` dict com ordem (`order`) e opções por etapa; aplica loader -> cleaners -> encoders -> scalers -> etc. e retorna um `DataFrame` final.
 
-> Observação: parte do `worker.py` e `main.py` contém código direto de enfileiramento/usos de Redis. Verifique exatamente como o `config` do pipeline é criado (no repositório enviado há exemplos de `input.csv` e `output.csv` em `jobs/`).
+O `worker.process_csv` constrói/define (ou deveria definir) um `config` onde o `loader.path` é `jobs/<job_id>/input.csv`, chama `Pipeline(config).run()` e grava `output.csv` na pasta do job.
 
+> Observação: parte do `worker.py` e `main.py` contém código direto de enfileiramento/usos de Redis. Verifique exatamente como o `config` do pipeline é criado (no repositório enviado há exemplos de `input.csv` e `output.csv` em `jobs/`).
 
 ---
 
+## Observações / problemas encontrados (curto e objetivo)
 
+1. **Virtualenv dentro do repositório** (`src/backend/.venv/`) — remover e adicionar `.venv/` ao `.gitignore`.
+2. **Sem `requirements.txt`/`pyproject.toml`** visível — adicione para facilitar instalação reproduzível.
+3. `main.py` importa `rq.Queue` mas o fluxo atual usa `redis_conn.rpush` + `blpop` no worker — existe uma inconsistência (ou sobra import). Escolha entre usar `rq`/`RQ` ou usar fila manual via listas Redis; hoje o código usa a lista Redis manualmente.
+4. `worker.py` possui `while True: blpop` — ok para POC, mas em produção prefira workers gerenciados (systemd, supervisor, containers) e tratamento de falhas/retries/logs.
+5. Segurança: endpoints sem autenticação — se for expor, adicione autenticação/limitação de tamanho de upload, validação de esquema CSV.
+
+---
+
+## Melhorias / roadmap sugerido (rápido)
+
+* Remover `.venv` e adicionar `requirements.txt`.
+* Padronizar enfileiramento: use `rq`/`celery` (com Redis) ou mantenha a lista Redis manual, mas remova imports obsoletos.
+* Adicionar testes unitários para `engine/` (pandas workflows).
+* Adicionar `docker-compose` com `backend` + `redis` para facilitar o desenvolvimento.
+* Expor logs e métricas básicas (arquivo de log, ou endpoint `/metrics`).
+
+---
+
+## Como eu posso ajudar agora
+
+Escolha uma das opções e eu faço na hora:
+
+1. Gerar um `requirements.txt` preciso a partir dos imports detectados.
+2. Remover `.venv` e criar um `.gitignore` e `docker-compose.yml` (backend + redis).
+3. Substituir o `rpush`/`blpop` por uma implementação com `rq` ou `celery` (faço a alteração no código).
+4. Gerar um `README.md` final pronto para the repo (versão curta e a versão técnica de desenvolvimento).
+
+Diz qual você quer que eu faça agora e eu executo direto no repositório que você subiu.
+
+---
 
 ## Changelog (v1.0)
 
+* README inicializado com descrição fiel ao código encontrado em `src/backend`.
 
 ---
 
-
+> Nota: este README foi escrito diretamente do conteúdo do zip `src.zip` que você enviou. Se quiser, eu já aplico as mudanças no repositório (ex: criar `requirements.txt`, `.gitignore` e `docker-compose.yml`) — só me diga qual das opções acima prefere.
