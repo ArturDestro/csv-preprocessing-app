@@ -4,7 +4,7 @@
 
 ---
 
-## Visão geral (curto e direto)
+## Visão geral
 
 Este repositório contém **frontend e backend** de um processador de arquivos CSV.
 
