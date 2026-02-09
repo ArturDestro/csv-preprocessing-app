@@ -28,6 +28,38 @@ Código relevante:
 
 ## Estrutura mínima importante (apenas arquivos do projeto, sem o .venv)
 
+**Frontend (Next.js)**
+
+O frontend está em `src/frontend/`. Observações gerais (baseadas na estrutura enviada):
+
+* Stack: **Next.js (React)** — o projeto roda como uma app Next, podendo estar em JavaScript ou TypeScript conforme `package.json`.
+* Funções principais da UI: upload de CSV, acompanhamento do status do job (polling ou WebSocket) e download do `output.csv` quando o job terminar.
+* Scripts comuns (verifique `package.json` em `src/frontend/`):
+
+  * `pnpm dev` / `npm run dev` — roda em modo desenvolvimento (hot-reload).
+  * `pnpm build` / `npm run build` — build para produção.
+  * `pnpm start` / `npm start` — serve a build em produção.
+* Configuração/API: o frontend deve apontar para o backend — verifique `NEXT_PUBLIC_API_BASE_URL` ou uso de proxies (`next.config.js`). As chamadas esperadas ao backend são:
+
+  * `POST /upload` para enviar o CSV (multipart/form-data)
+  * `GET /jobs/{job_id}` para checar status
+  * `GET /download_csv/{job_id}` para baixar o resultado
+* Arquivos estáticos: verifique `public/` para assets, e `src/` (ou `pages/`, `app/`) para as rotas/páginas do front.
+
+**Como rodar o frontend (dev)**
+
+```bash
+cd src/frontend
+# instalar dependências
+pnpm install   # ou npm install
+# rodar em dev
+pnpm dev       # ou npm run dev
+```
+
+A UI normalmente ficará disponível em `http://localhost:3000`.
+
+---
+
 ```
 src/backend/
 ├─ main.py           # FastAPI - endpoints
