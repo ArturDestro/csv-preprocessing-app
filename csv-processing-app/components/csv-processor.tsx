@@ -16,19 +16,30 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { CsvPreview } from "@/components/csv-preview"
 import { ColumnSelector } from "@/components/column-selector"
 import { PipelineStep } from "@/components/pipeline-step"
 
 type JobStatus = "idle" | "uploading" | "queued" | "processing" | "finished" | "failed"
 
-type CleanerType = "mean" | "median" | "mode"
+type CleanerType = "mean" | "median" | "mode" | "constant"
 type EncoderType = "onehot" | "label" | "ordinal"
 type ScalerType = "standard" | "minmax" | "robust"
+type CastType = "int" | "float" | "bool" | "str"
 
-type StepId = "cleaner" | "encoder" | "scaler"
+type StepId = "cleaner" | "encoder" | "scaler" | "typecaster"
 
 interface ParsedCsv {
   headers: string[]
@@ -37,9 +48,10 @@ interface ParsedCsv {
 }
 
 const STEP_LABELS: Record<StepId, string> = {
-  cleaner: "Missing Values (Cleaner)",
-  encoder: "Encoding (Categorical Features)",
-  scaler: "Scaling (Numeric Features)",
+  cleaner: "Cleaner (Missing Values)",
+  typecaster: "TypeCaster (Column Types)",
+  encoder: "Encoder (Categorical Features)",
+  scaler: "Scaler (Numeric Features)",
 }
 
 export function CsvProcessor() {
@@ -50,19 +62,31 @@ export function CsvProcessor() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Pipeline order
-  const [stepOrder, setStepOrder] = useState<StepId[]>(["cleaner", "encoder", "scaler"])
+  const [stepOrder, setStepOrder] = useState<StepId[]>([
+    "cleaner",
+    "typecaster",
+    "encoder",
+    "scaler",
+  ])
 
-  // Pipeline config
+  // Cleaner config
   const [cleaner, setCleaner] = useState<CleanerType>("mean")
-  const [encoder, setEncoder] = useState<EncoderType>("onehot")
-  const [scaler, setScaler] = useState<ScalerType>("standard")
-  const [ordinalMapping, setOrdinalMapping] = useState(
-    '{\n  "column_name": ["low", "medium", "high"]\n}'
-  )
-
-  // Column selections
+  const [cleanerRemoveDuplicates, setCleanerRemoveDuplicates] = useState(false)
+  const [cleanerConstantValue, setCleanerConstantValue] = useState("")
   const [cleanerColumns, setCleanerColumns] = useState<string[]>([])
+
+  // TypeCaster config
+  const [typecasterSchema, setTypecasterSchema] = useState<Record<string, CastType>>({})
+
+  // Encoder config
+  const [encoder, setEncoder] = useState<EncoderType>("onehot")
+  const [ordinalMapping, setOrdinalMapping] = useState(
+    '{\n  "column_name": {\n    "low": 0,\n    "medium": 1,\n    "high": 2\n  }\n}'
+  )
   const [encoderColumns, setEncoderColumns] = useState<string[]>([])
+
+  // Scaler config
+  const [scaler, setScaler] = useState<ScalerType>("standard")
   const [scalerColumns, setScalerColumns] = useState<string[]>([])
 
   // Drag state
@@ -109,6 +133,12 @@ export function CsvProcessor() {
       setCleanerColumns([...headers])
       setEncoderColumns([...headers])
       setScalerColumns([...headers])
+      // Initialize typecaster schema with "str" for all columns
+      const initialSchema: Record<string, CastType> = {}
+      for (const h of headers) {
+        initialSchema[h] = "str"
+      }
+      setTypecasterSchema(initialSchema)
     }
     reader.readAsText(csvFile)
   }, [])
@@ -135,6 +165,7 @@ export function CsvProcessor() {
     setCleanerColumns([])
     setEncoderColumns([])
     setScalerColumns([])
+    setTypecasterSchema({})
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -197,26 +228,47 @@ export function CsvProcessor() {
       const formData = new FormData()
       formData.append("file", file)
 
-      const pipelineConfig = {
+      // Build cleaner config
+      const cleanerConfig: Record<string, unknown> = {
+        type: cleaner,
+        remove_duplicates: cleanerRemoveDuplicates,
+        columns:
+          cleanerColumns.length === parsedCsv?.headers.length ? null : cleanerColumns,
+      }
+      if (cleaner === "constant") {
+        cleanerConfig.value = cleanerConstantValue
+      }
+
+      // Build typecaster config - only include columns that aren't "str" (the default)
+      const filteredSchema: Record<string, string> = {}
+      for (const [col, type] of Object.entries(typecasterSchema)) {
+        if (type !== "str") {
+          filteredSchema[col] = type
+        }
+      }
+
+      const pipelineConfig: Record<string, unknown> = {
         order: ["loader", ...stepOrder],
         loader: {
           type: "csv",
           separator: ",",
         },
-        cleaner: {
-          type: cleaner,
-          columns: cleanerColumns.length === parsedCsv?.headers.length ? null : cleanerColumns,
+        cleaner: cleanerConfig,
+        typecaster: {
+          schema: Object.keys(filteredSchema).length > 0 ? filteredSchema : typecasterSchema,
         },
         encoder: {
           type: encoder,
           ...(encoder === "ordinal" && {
             mapping: JSON.parse(ordinalMapping),
           }),
-          columns: encoderColumns.length === parsedCsv?.headers.length ? null : encoderColumns,
+          columns:
+            encoderColumns.length === parsedCsv?.headers.length ? null : encoderColumns,
         },
         scaler: {
           type: scaler,
-          columns: scalerColumns.length === parsedCsv?.headers.length ? null : scalerColumns,
+          columns:
+            scalerColumns.length === parsedCsv?.headers.length ? null : scalerColumns,
         },
       }
       formData.append("config", JSON.stringify(pipelineConfig))
@@ -256,7 +308,11 @@ export function CsvProcessor() {
     setCleanerColumns([])
     setEncoderColumns([])
     setScalerColumns([])
-    setStepOrder(["cleaner", "encoder", "scaler"])
+    setTypecasterSchema({})
+    setCleaner("mean")
+    setCleanerRemoveDuplicates(false)
+    setCleanerConstantValue("")
+    setStepOrder(["cleaner", "typecaster", "encoder", "scaler"])
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -309,6 +365,10 @@ export function CsvProcessor() {
     setOverId(null)
   }
 
+  const updateColumnType = (column: string, type: CastType) => {
+    setTypecasterSchema((prev) => ({ ...prev, [column]: type }))
+  }
+
   const isProcessing =
     status === "uploading" || status === "queued" || status === "processing"
 
@@ -359,39 +419,142 @@ export function CsvProcessor() {
       case "cleaner":
         return (
           <>
-            <RadioGroup
-              value={cleaner}
-              onValueChange={(v: string) => setCleaner(v as CleanerType)}
-              disabled={isProcessing}
-              className="flex flex-wrap gap-x-6 gap-y-2"
-            >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="mean" id="cleaner-mean" />
-                <Label htmlFor="cleaner-mean" className="text-sm font-normal cursor-pointer">
-                  Mean
+            <div className="flex items-center gap-2 pb-1">
+              <Checkbox
+                id="cleaner-remove-duplicates"
+                checked={cleanerRemoveDuplicates}
+                onCheckedChange={(checked) =>
+                  setCleanerRemoveDuplicates(checked === true)
+                }
+                disabled={isProcessing}
+                className="h-3.5 w-3.5"
+              />
+              <Label
+                htmlFor="cleaner-remove-duplicates"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Remove duplicate rows
+              </Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                Missing value strategy
+              </Label>
+              <RadioGroup
+                value={cleaner}
+                onValueChange={(v: string) => setCleaner(v as CleanerType)}
+                disabled={isProcessing}
+                className="flex flex-wrap gap-x-6 gap-y-2"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="mean" id="cleaner-mean" />
+                  <Label
+                    htmlFor="cleaner-mean"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Mean
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="median" id="cleaner-median" />
+                  <Label
+                    htmlFor="cleaner-median"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Median
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="mode" id="cleaner-mode" />
+                  <Label
+                    htmlFor="cleaner-mode"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Mode
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="constant" id="cleaner-constant" />
+                  <Label
+                    htmlFor="cleaner-constant"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Constant
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {cleaner === "constant" && (
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="constant-value"
+                  className="text-xs text-muted-foreground"
+                >
+                  Fill value
                 </Label>
+                <Input
+                  id="constant-value"
+                  value={cleanerConstantValue}
+                  onChange={(e) => setCleanerConstantValue(e.target.value)}
+                  disabled={isProcessing}
+                  placeholder='e.g. "unknown", 0, N/A'
+                  className="h-8 text-sm"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="median" id="cleaner-median" />
-                <Label htmlFor="cleaner-median" className="text-sm font-normal cursor-pointer">
-                  Median
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="mode" id="cleaner-mode" />
-                <Label htmlFor="cleaner-mode" className="text-sm font-normal cursor-pointer">
-                  Mode
-                </Label>
-              </div>
-            </RadioGroup>
+            )}
+
             <ColumnSelector
               label="Apply to columns"
-              description="Select which columns to apply missing value imputation"
+              description="Select which columns to clean"
               columns={parsedCsv?.headers ?? []}
               selected={cleanerColumns}
               onChange={setCleanerColumns}
               disabled={isProcessing}
             />
+          </>
+        )
+
+      case "typecaster":
+        return (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Set the target type for each column. Columns left as{" "}
+              <span className="font-mono">str</span> will not be cast.
+            </p>
+            {parsedCsv && parsedCsv.headers.length > 0 ? (
+              <div className="max-h-48 overflow-y-auto rounded-md border p-2">
+                <div className="space-y-2">
+                  {parsedCsv.headers.map((col) => (
+                    <div key={col} className="flex items-center justify-between gap-4">
+                      <Label className="text-sm font-mono truncate flex-1 min-w-0">
+                        {col}
+                      </Label>
+                      <Select
+                        value={typecasterSchema[col] ?? "str"}
+                        onValueChange={(v) => updateColumnType(col, v as CastType)}
+                        disabled={isProcessing}
+                      >
+                        <SelectTrigger className="w-24 h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="str">str</SelectItem>
+                          <SelectItem value="int">int</SelectItem>
+                          <SelectItem value="float">float</SelectItem>
+                          <SelectItem value="bool">bool</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic py-2">
+                Upload a CSV to see available columns
+              </p>
+            )}
           </>
         )
 
@@ -406,19 +569,28 @@ export function CsvProcessor() {
             >
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="onehot" id="encoder-onehot" />
-                <Label htmlFor="encoder-onehot" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="encoder-onehot"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   One-Hot
                 </Label>
               </div>
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="label" id="encoder-label" />
-                <Label htmlFor="encoder-label" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="encoder-label"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   Label
                 </Label>
               </div>
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="ordinal" id="encoder-ordinal" />
-                <Label htmlFor="encoder-ordinal" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="encoder-ordinal"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   Ordinal
                 </Label>
               </div>
@@ -426,7 +598,10 @@ export function CsvProcessor() {
 
             {encoder === "ordinal" && (
               <div className="space-y-2">
-                <Label htmlFor="ordinal-mapping" className="text-xs text-muted-foreground">
+                <Label
+                  htmlFor="ordinal-mapping"
+                  className="text-xs text-muted-foreground"
+                >
                   Ordinal Mapping (JSON)
                 </Label>
                 <Textarea
@@ -435,7 +610,7 @@ export function CsvProcessor() {
                   onChange={(e) => setOrdinalMapping(e.target.value)}
                   disabled={isProcessing}
                   className="font-mono text-xs h-24"
-                  placeholder='{"column_name": ["low", "medium", "high"]}'
+                  placeholder='{"column": {"low": 0, "medium": 1, "high": 2}}'
                 />
               </div>
             )}
@@ -462,19 +637,28 @@ export function CsvProcessor() {
             >
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="standard" id="scaler-standard" />
-                <Label htmlFor="scaler-standard" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="scaler-standard"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   Standard
                 </Label>
               </div>
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="minmax" id="scaler-minmax" />
-                <Label htmlFor="scaler-minmax" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="scaler-minmax"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   Min-Max
                 </Label>
               </div>
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="robust" id="scaler-robust" />
-                <Label htmlFor="scaler-robust" className="text-sm font-normal cursor-pointer">
+                <Label
+                  htmlFor="scaler-robust"
+                  className="text-sm font-normal cursor-pointer"
+                >
                   Robust
                 </Label>
               </div>
@@ -500,7 +684,8 @@ export function CsvProcessor() {
           CSV Preprocessing Pipeline
         </h1>
         <p className="text-sm text-muted-foreground">
-          Upload a CSV file, preview the data, select columns, and configure the processing pipeline.
+          Upload a CSV file, preview the data, select columns, and configure
+          the processing pipeline.
         </p>
       </div>
 
@@ -513,7 +698,9 @@ export function CsvProcessor() {
               onClick={() => fileInputRef.current?.click()}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+              onKeyDown={(e) =>
+                e.key === "Enter" && fileInputRef.current?.click()
+              }
               role="button"
               tabIndex={0}
             >
@@ -529,21 +716,30 @@ export function CsvProcessor() {
               <p className="text-sm font-medium text-foreground">
                 Click to upload or drag and drop
               </p>
-              <p className="text-xs text-muted-foreground mt-1">CSV files only</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                CSV files only
+              </p>
             </div>
           ) : (
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium text-foreground">{file.name}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {file.name}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {(file.size / 1024).toFixed(1)} KB
                   </p>
                 </div>
               </div>
               {!isProcessing && (
-                <Button variant="ghost" size="icon" onClick={removeFile} className="h-8 w-8">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={removeFile}
+                  className="h-8 w-8"
+                >
                   <X className="h-4 w-4" />
                   <span className="sr-only">Remove file</span>
                 </Button>
@@ -575,7 +771,9 @@ export function CsvProcessor() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Pipeline Configuration</CardTitle>
+              <CardTitle className="text-base">
+                Pipeline Configuration
+              </CardTitle>
               <p className="text-xs text-muted-foreground">
                 Drag steps to reorder the pipeline
               </p>
@@ -617,7 +815,11 @@ export function CsvProcessor() {
                   </Button>
                 )}
                 {status === "finished" && (
-                  <Button onClick={handleDownload} variant="outline" size="sm">
+                  <Button
+                    onClick={handleDownload}
+                    variant="outline"
+                    size="sm"
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>

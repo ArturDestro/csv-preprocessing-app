@@ -24,9 +24,12 @@ class Pipeline:
 
             if step == "cleaner":
                 from engine.Cleaner.cleanerFactory import CleanerFactory
-                cleaner = CleanerFactory.create(step_config)
-                cleaner.fit(df)
-                df = cleaner.transform(df)
+                cleaners = CleanerFactory.create(step_config)
+
+                for cleaner in cleaners:
+                    cleaner.fit(df)
+                    df = cleaner.transform(df)
+
                 continue
 
             if step == "encoder":
@@ -41,6 +44,13 @@ class Pipeline:
                 scaler = ScalerFactory.create(step_config)
                 scaler.fit(df)
                 df = scaler.transform(df)
+                continue
+
+            if step == "typecaster":
+                from engine.TypeCaster.typecasterFactory import TypeCasterFactory
+                type_caster = TypeCasterFactory.create(step_config)
+                type_caster.fit()
+                df = type_caster.transform(df)
                 continue
 
         return df

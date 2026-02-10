@@ -6,7 +6,39 @@ class BaseCleaner:
     
     def transform(self, df):
         raise NotImplementedError
+
+class DuplicateCleaner(BaseCleaner):
+    def __init__(self, config):
+        self.fitted = False
+
+    def fit(self, df):
+        #stateless
+        return self
     
+    def transform(self, df):
+        return df.copy().drop_duplicates().reset_index(drop=True)
+    
+class ConstantCleaner(BaseCleaner):
+    def __init__(self, config):
+        self.columns = config["columns"]
+        self.fitted = False
+        self.value = config["value"]
+
+    def fit(self, df):
+        if self.columns is None:
+            self.columns = df.select_dtypes(include="object").columns
+        #No need for complex structure on fit, since the value is passed through config
+        self.fitted = True
+        return self
+    
+    def transform(self, df):
+        if self.fitted:
+            df_copy = df.copy()
+            for col in self.columns:
+                df_copy[col] = df_copy[col].fillna(self.value)
+            return df_copy
+        raise ValueError("Cleaner must be fitted before calling transform()")
+
 class ModeCleaner(BaseCleaner):
     def __init__(self, config):
         self.columns = config["columns"]
