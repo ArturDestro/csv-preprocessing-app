@@ -1,6 +1,6 @@
 # CSV Processing App — README (versão 1.0)
 
-**Status:** v1.0
+**Status:** v1.1
 
 ---
 
@@ -150,8 +150,10 @@ Local: `src/backend/engine/`
 
 Principais componentes:
 
+* `TypeCaster` (TypeCaster) — Implementa Conversor de Tipos 
 * `Loader` (CSVLoader) — lê CSV, detecta separador e encoding quando não fornecidos (usa `chardet`).
-* `Scaler` — implementa `standard`, `minmax`, `robust` (fit / transform sobre colunas selecionadas).
+* `Scaler` — implementa `standard`, `minmax`, `robust`, `constant` (fit / transform sobre colunas selecionadas).
+*  `Cleaner` — implementa `mean`, `mode`, `median`, `duplicates` (fit / transform sobre colunas selecionadas).
 * `Encoder` — `onehot`, `ordinal`, `label`.
 * `Pipeline` — recebe um `config` dict com ordem (`order`) e opções por etapa; aplica loader -> cleaners -> encoders -> scalers -> etc. e retorna um `DataFrame` final.
 
@@ -165,5 +167,10 @@ Principais componentes:
 - Processamento assíncrono via backend
 - Download do CSV processado
 
+### v1.1 (10/02/2026)
+- Funcionalidade: Remover duplicatas
+- Funcionalidade: Conversor de Tipos
+- Funcionalidade: Preencher valores ausentes por constante
+- Otimizações de código
 ---
 
