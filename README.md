@@ -1,4 +1,4 @@
-# CSV Processing App — README (versão 1.0)
+# CSV Processing App — README (versão 1.1)
 
 **Status:** v1.1
 
