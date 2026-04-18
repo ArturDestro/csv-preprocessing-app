@@ -7,7 +7,7 @@ import traceback
 #test config
 
 QUEUE = "csv_jobs"
-r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+r = redis.Redis(host="redis", port=6379, decode_responses=True)
 
 def process_csv(job_id):
     try:
