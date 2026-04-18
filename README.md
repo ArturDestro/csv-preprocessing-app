@@ -1,169 +1,327 @@
-# CSV Processing App — README (versão 1.0)
+# CSV Preprocessor — README (v1.1)
 
-**Status:** v1.0
+**Status:** v1.1
 
 ---
 
 ## Visão geral
 
-Este repositório contém **frontend e backend** de um processador de arquivos CSV.
+Este repositório contém o **frontend** e o **backend** de um processador de arquivos CSV com interface visual para construção de pipelines de pré-processamento de dados.
 
-* **Frontend**: aplicação web (Next.js / React) responsável por upload do CSV, acompanhamento do status do job e download do resultado.
-* **Backend**: API em FastAPI que recebe uploads, cria *jobs*, enfileira no Redis e processa os CSVs via um worker dedicado.
+- **Frontend:** aplicação web em Next.js/React para upload de CSV, montagem visual do pipeline, prévia dos dados, visualização de gráficos e download do resultado.
+- **Backend:** API em FastAPI que recebe arquivos, cria *jobs*, persiste configurações, enfileira processamento via Redis e executa o pipeline em um worker dedicado.
 
 Fluxo geral:
 
 1. Usuário faz upload do CSV pela interface web.
-2. Frontend chama a API (`/upload`) e recebe um `job_id`.
-3. Backend enfileira o job no Redis.
-4. Worker consome a fila, executa o pipeline de processamento e gera `output.csv`.
-5. Frontend consulta o status e libera o download quando o job finaliza.
-
-Código relevante:
-
-* Frontend: `src/frontend/`
-* Backend: `src/backend/` (arquivos principais: `main.py`, `worker.py`, `job_utils.py`, `engine/`).
+2. Frontend chama `POST /upload` e recebe um `job_id`.
+3. Usuário monta o pipeline visualmente (etapas, estratégias, colunas).
+4. Frontend chama `POST /run_pipeline/{job_id}` com a configuração serializada.
+5. Backend salva o `config.json` do job e enfileira no Redis.
+6. Worker consome a fila, executa o pipeline e gera `output.csv`.
+7. Frontend exibe gráficos via `POST /generate_chart` e libera o download via `GET /download_csv/{job_id}`.
 
 ---
 
-## Estrutura
+## O que mudou da v1.0 para a v1.1
 
-**Frontend (Next.js)**
+### Frontend (novo)
 
-O frontend está em `src/frontend/`. Observações gerais (baseadas na estrutura enviada):
+A v1.0 não possuía interface gráfica funcional. A v1.1 introduz uma aplicação Next.js completa com:
 
-* Stack: **Next.js (React)** — o projeto roda como uma app Next.
-* Funções principais da UI: upload de CSV, acompanhamento do status do job (polling ou WebSocket) e download do `output.csv` quando o job terminar.
-* Configuração/API: o frontend deve apontar para o backend — verifique `NEXT_PUBLIC_API_BASE_URL` ou uso de proxies (`next.config.js`). As chamadas esperadas ao backend são:
+- **Upload com drag-and-drop** — zona de drop com validação de `.csv`, prévia do nome e tamanho do arquivo, e feedback visual de sucesso/erro.
+- **Prévia do CSV com seleção de colunas** — exibe as primeiras linhas do arquivo diretamente no browser (parse client-side) e permite selecionar quais colunas serão incluídas no pipeline.
+- **Pipeline builder visual** — cards interativos por etapa (Loader, Cleaner, TypeCaster, Encoder, Scaler) com toggle de ativação e configuração inline. As etapas podem ser reordenadas via drag-and-drop, e um resumo do fluxo (`loader → cleaner → encoder → scaler`) é exibido em tempo real.
+- **Painel de gráficos** — aba Charts integrada à página principal; consome o endpoint `/generate_chart` e renderiza visualizações Plotly com seleção de colunas X/Y.
+- **Separação de upload e execução do pipeline** — na v1.0 o pipeline era disparado junto ao upload. Na v1.1 o upload é independente e o pipeline roda em uma etapa separada, permitindo iterar sobre a configuração sem re-enviar o arquivo.
 
-  * `POST /upload` para enviar o CSV (multipart/form-data)
-  * `GET /jobs/{job_id}` para checar status
-  * `GET /download_csv/{job_id}` para baixar o resultado
-* Arquivos estáticos: verifique `public/` para assets, e `src/` (ou `pages/`, `app/`) para as rotas/páginas do front.
+### Backend (novos endpoints e engine)
 
-**Como rodar o frontend (dev)**
+| Endpoint | v1.0 | v1.1 |
+|---|---|---|
+| `POST /upload` | Upload + enfileiramento imediato | Upload apenas (salva `input.csv`, status `uploaded`) |
+| `POST /run_pipeline/{job_id}` | — | Recebe config JSON, salva `config.json`, enfileira o job |
+| `POST /generate_chart` | — | Retorna dados Plotly para visualização de colunas |
+| `GET /jobs/{job_id}` | Retorna status | Retorna status + mensagem de erro (se houver `error.txt`) |
+| `GET /download_csv/{job_id}` | Disponível | Mantido |
+| `GET /ping` | Mantido | Mantido |
 
-```bash
-cd src/csv-preprocessing-app
-# instalar dependências
-pnpm install   # ou npm install
-# rodar em dev
-pnpm dev       # ou npm run dev
-```
+### Engine (novos steps e estratégias)
 
-A UI normalmente ficará disponível em `http://localhost:3000`.
+**Cleaner** — na v1.0 havia limpeza básica. A v1.1 adiciona quatro estratégias explícitas de imputação de nulos e remoção de duplicatas:
+
+- `DuplicateCleaner` — remove linhas duplicadas.
+- `ConstantCleaner` — preenche nulos com um valor fixo.
+- `ModeCleaner` — preenche nulos com a moda da coluna.
+- `MeanCleaner` — preenche nulos com a média (colunas numéricas).
+- `MedianCleaner` — preenche nulos com a mediana (colunas numéricas).
+
+**TypeCaster** — step novo. Converte colunas para tipos explícitos (`int`, `float`, `string`, `bool`, `datetime`) usando um schema configurado pelo usuário na UI.
+
+**Encoder** — adiciona dois novos encoders além do básico:
+
+- `OrdinalEncoder` — mapeia categorias a inteiros segundo uma ordem definida pelo usuário.
+- `LabelEncoder` — mapeia valores únicos automaticamente a inteiros sequenciais.
+- `OneHotEncoder` — mantido da v1.0, com correção de alinhamento de colunas entre fit e transform.
+
+**Scaler** — adiciona `RobustScaler` (usa mediana e IQR, resistente a outliers) além de `StandardScaler` e `MinMaxScaler`.
+
+**Pipeline** — agora suporta `typecaster` como step nomeado. Todos os steps respeitam a chave `order` no config, permitindo pipelines em qualquer sequência.
 
 ---
 
+## Estrutura do projeto
+
 ```
-src/backend/
-├─ main.py           # FastAPI - endpoints
-├─ worker.py         # loop do worker (redis.blpop) + process_csv
-├─ job_utils.py      # util para criar pasta de job
-├─ jobs/             # exemplo/artefatos de jobs (input.csv / output.csv)
-└─ engine/           # pipeline e componentes (Loader, Scaler, Encoder, ...)
+src/
+├── backend/
+│   ├── main.py           # FastAPI — endpoints da API
+│   ├── worker.py         # Worker Redis (blpop + process_csv)
+│   ├── job_utils.py      # Utilitários de criação de diretórios de job
+│   ├── jobs/             # Artefatos por job (input.csv, config.json, output.csv)
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── engine/
+│       ├── pipeline.py
+│       ├── Loader/       # csv_loader.py, loaderFactory.py
+│       ├── Cleaner/      # cleaner.py (5 estratégias), cleanerFactory.py
+│       ├── TypeCaster/   # TypeCaster.py, typecasterFactory.py
+│       ├── Encoder/      # encoder.py (OneHot, Label, Ordinal), encoderFactory.py
+│       └── Scaler/       # scaler.py (Standard, MinMax, Robust), scalerFactory.py
+└── frontend/
+    ├── app/
+    │   ├── page.tsx      # Página principal (Upload → Preview → Pipeline/Charts)
+    │   └── layout.tsx
+    ├── components/
+    │   ├── csv-uploader.tsx       # Drag-and-drop upload
+    │   ├── csv-preview.tsx        # Prévia e seleção de colunas
+    │   ├── pipeline-panel.tsx     # Builder visual do pipeline
+    │   ├── pipeline-block-card.tsx # Card por step (toggle + config)
+    │   └── chart-panel.tsx        # Painel de gráficos Plotly
+    ├── lib/
+    │   ├── pipeline-types.ts      # Tipos e defaults do pipeline
+    │   └── utils.ts
+    ├── Dockerfile
+    └── next.config.mjs
 ```
 
-> Observação: o repositório que você enviou contém um diretório `.venv/` dentro de `src/backend/`. Recomendo remover o virtualenv do repositório (adicionar no `.gitignore`) e manter apenas um `requirements.txt` ou `pyproject.toml`.
+> **Atenção:** o diretório `.venv/` está dentro de `src/backend/` no repositório. Adicione-o ao `.gitignore` e mantenha apenas o `requirements.txt`.
 
 ---
 
-## Dependências (apontamento prático)
+## Tech stack
 
-O código usa (observado nos imports):
+| Camada | Tecnologias |
+|---|---|
+| Frontend | Next.js 14, React, TypeScript, Tailwind CSS, shadcn/ui, Plotly |
+| Backend | Python 3.11, FastAPI, Uvicorn |
+| Fila | Redis, RQ (blpop manual) |
+| Engine | pandas, numpy, chardet |
+| Infra | Docker (Dockerfile no backend e no frontend) |
 
-* `fastapi` (API)
-* `uvicorn` (server ASGI)
-* `redis` (cliente Redis)
-* `rq` (importado em `main.py`, mas note: o enfileiramento atual usa `redis_conn.rpush` e o worker usa `blpop` — `rq` não é realmente necessário a menos que você opte por usar a biblioteca RQ)
-* `pandas`, `numpy` (manipulação de CSV / tabelas)
-* `chardet` (detecção de encoding)
-
-Exemplo rápido para instalar (sugestão):
-
-```bash
-python -m venv .venv
-source .venv/bin/activate       # ou .venv\Scripts\activate no Windows
-pip install fastapi uvicorn redis rq pandas numpy chardet
-```
 ---
 
-## Como rodar (modo desenvolvimento)
+## Como rodar (desenvolvimento)
 
-1. Abra um terminal e vá para a pasta do backend:
+### Pré-requisitos
+
+- Python 3.10+
+- Node.js 18+ / pnpm
+- Redis rodando em `localhost:6379`
+
+### Backend
 
 ```bash
 cd src/backend
-```
 
-2. Crie e ative o venv e instale dependências (veja seção anterior).
+# Criar e ativar virtualenv
+python -m venv .venv
+source .venv/bin/activate       # Linux/macOS
+.venv\Scripts\activate          # Windows
 
-3. Rode o servidor FastAPI (API):
+# Instalar dependências
+pip install -r requirements.txt
 
-```bash
+# Subir o Redis (via Docker)
+docker run -p 6379:6379 redis
+
+# Rodar a API
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
 
-> Observação: `main.py` importa `job_utils` e lê/escreve em `jobs/<job_id>/`, por isso execute o comando a partir de `src/backend`.
-
-4. Rode o worker (consumidor da fila):
-
-```bash
+# Em outro terminal: rodar o worker
 python worker.py
 ```
 
-O `worker.py` faz um `blpop` na lista Redis chamada `csv_jobs` e chama `process_csv(job_id)`.
+API disponível em `http://localhost:8000`  
+Swagger UI em `http://localhost:8000/docs`
 
-5. Certifique-se de ter uma instância Redis rodando em `localhost:6379` (config hard-coded no código).
+### Frontend
+
+```bash
+cd src/frontend
+
+# Instalar dependências
+pnpm install    # ou npm install
+
+# Configurar a URL do backend
+echo "NEXT_PUBLIC_API_BASE=http://localhost:8000" > .env.local
+
+# Rodar em modo dev
+pnpm dev        # ou npm run dev
+```
+
+UI disponível em `http://localhost:3000`
 
 ---
 
-## Endpoints da API (implementados)
+## Endpoints da API
 
-* `GET /ping` — simples healthcheck retornando `{"message":"pong"}`.
-* `POST /upload` — recebe multipart/form-data com campo `file` (o CSV).
+### `GET /ping`
+Health check. Retorna `{"message": "pong"}`.
 
-  * Cria `jobs/<job_id>/` e grava `input.csv` lá.
-  * Define `job:{job_id}:status` = `queued` no Redis e faz `rpush(QUEUE, json(job))` para enfileirar.
-  * Retorna `{"job_id": "<uuid>", "status": "queued"}`.
-* `GET /jobs/{job_id}` — retorna o status (`queued`, `processing`, `finished`, etc.) lido em `job:{job_id}:status` no Redis.
-* `GET /download_csv/{job_id}` — baixa `jobs/<job_id>/output.csv` se o status for `finished`.
+### `POST /upload`
+Recebe um CSV via `multipart/form-data` (campo `file`).
 
-### Exemplo (curl)
+- Cria `jobs/<job_id>/` e grava `input.csv`.
+- Define `job:{job_id}:status = uploaded` no Redis.
+- Retorna `{"job_id": "<uuid>", "status": "uploaded"}`.
+
+### `POST /run_pipeline/{job_id}`
+Recebe a configuração do pipeline como JSON no body.
+
+- Salva `config.json` no diretório do job.
+- Enfileira o job na lista Redis `csv_jobs`.
+- Define `job:{job_id}:status = queued`.
+- Retorna `{"job_id": "<uuid>", "status": "queued"}`.
+
+Exemplo de payload:
+
+```json
+{
+  "order": ["loader", "cleaner", "encoder", "scaler"],
+  "loader": { "type": "csv", "separator": "," },
+  "cleaner": { "type": "mean", "remove_duplicates": true, "columns": ["age", "salary"] },
+  "encoder": { "type": "onehot", "columns": ["gender"] },
+  "scaler":  { "type": "standard", "columns": ["age", "salary"] }
+}
+```
+
+### `GET /jobs/{job_id}`
+Retorna o status atual do job. Se houver falha, inclui o campo `error` com o conteúdo de `error.txt`.
+
+```json
+{ "job_id": "...", "status": "finished" }
+{ "job_id": "...", "status": "failed", "error": "..." }
+```
+
+Status possíveis: `uploaded` → `queued` → `processing` → `finished` / `failed`.
+
+### `POST /generate_chart`
+Recebe `job_id` e `chart` (tipo, eixo x, eixo y) e retorna dados no formato Plotly.
+
+```json
+{
+  "job_id": "...",
+  "chart": { "type": "scatter", "x": "age", "y": "salary" }
+}
+```
+
+### `GET /download_csv/{job_id}`
+Baixa o `output.csv` processado. Retorna 409 se o job não estiver com status `finished`.
+
+### Exemplo via curl
 
 ```bash
-# upload
-curl -F "file=@meuarquivo.csv" http://localhost:8000/upload
+# 1. Upload
+curl -F "file=@dados.csv" http://localhost:8000/upload
 
-# checar status
+# 2. Rodar pipeline
+curl -X POST http://localhost:8000/run_pipeline/<job_id> \
+  -H "Content-Type: application/json" \
+  -d '{"order":["loader","scaler"],"scaler":{"type":"minmax","columns":["price"]}}'
+
+# 3. Checar status
 curl http://localhost:8000/jobs/<job_id>
 
-# baixar resultado (quando status == finished)
+# 4. Baixar resultado
 curl -O http://localhost:8000/download_csv/<job_id>
 ```
 
 ---
 
-## Engine (onde acontece o processamento)
+## Engine — referência de configuração
 
-Local: `src/backend/engine/`
+### Loader
 
-Principais componentes:
+```json
+{ "type": "csv", "separator": "," }
+```
 
-* `Loader` (CSVLoader) — lê CSV, detecta separador e encoding quando não fornecidos (usa `chardet`).
-* `Scaler` — implementa `standard`, `minmax`, `robust` (fit / transform sobre colunas selecionadas).
-* `Encoder` — `onehot`, `ordinal`, `label`.
-* `Pipeline` — recebe um `config` dict com ordem (`order`) e opções por etapa; aplica loader -> cleaners -> encoders -> scalers -> etc. e retorna um `DataFrame` final.
+### Cleaner
+
+```json
+{
+  "type": "mean",          // "mean" | "median" | "mode" | "constant"
+  "remove_duplicates": true,
+  "columns": ["col1", "col2"],
+  "value": 0               // apenas para type "constant"
+}
+```
+
+### TypeCaster
+
+```json
+{
+  "schema": {
+    "age": "int",
+    "score": "float",
+    "active": "bool"
+  }
+}
+```
+
+Tipos suportados: `int`, `float`, `string`, `bool`, `datetime`.
+
+### Encoder
+
+```json
+{
+  "type": "onehot",        // "onehot" | "label" | "ordinal"
+  "columns": ["gender"],
+  "mapping": {             // apenas para type "ordinal"
+    "size": { "S": 0, "M": 1, "L": 2 }
+  }
+}
+```
+
+### Scaler
+
+```json
+{
+  "type": "standard",      // "standard" | "minmax" | "robust"
+  "columns": ["age", "salary"]
+}
+```
 
 ---
 
-## Changelog (v1.0)
+## Changelog
+
+### v1.1
+
+- Frontend completo em Next.js com upload drag-and-drop, prévia de colunas e pipeline builder visual.
+- Painel de gráficos integrado (Plotly) com seleção de eixos.
+- Separação entre upload (`POST /upload`) e execução do pipeline (`POST /run_pipeline/{job_id}`).
+- Novo endpoint `POST /generate_chart`.
+- Novo step **TypeCaster** no pipeline.
+- **Cleaner** agora suporta cinco estratégias: `duplicate`, `constant`, `mode`, `mean`, `median`.
+- **Encoder** adiciona `LabelEncoder` e `OrdinalEncoder`.
+- **Scaler** adiciona `RobustScaler`.
+- Status de erro com detalhes do traceback via `error.txt` no diretório do job.
 
 ### v1.0
-- Primeira versão funcional do app
-- Upload de arquivos CSV pelo frontend
-- Processamento assíncrono via backend
-- Download do CSV processado
 
----
-
+- Primeira versão funcional do app.
+- Upload de arquivos CSV pelo frontend.
+- Processamento assíncrono via backend (Redis + RQ).
+- Download do CSV processado.
