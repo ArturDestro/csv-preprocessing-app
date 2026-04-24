@@ -306,7 +306,12 @@ Tipos suportados: `int`, `float`, `string`, `bool`, `datetime`.
 ---
 
 ## Changelog
+### v1.1
 
+- Exportação do CSV processado
+- Exportação do pipeline em JSON
+- Adição de um switch que possibilita ver preview do CSV processado
+  
 ### v1.1
 
 - Frontend completo em Next.js com upload drag-and-drop, prévia de colunas e pipeline builder visual.
