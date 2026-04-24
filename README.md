@@ -1,6 +1,6 @@
 # CSV Preprocessor — README (v1.1)
 
-**Status:** v1.1
+**Status:** v1.2
 
 ---
 
@@ -306,7 +306,7 @@ Tipos suportados: `int`, `float`, `string`, `bool`, `datetime`.
 ---
 
 ## Changelog
-### v1.1
+### v1.2
 
 - Exportação do CSV processado
 - Exportação do pipeline em JSON
