@@ -1,6 +1,6 @@
-# CSV Preprocessor — README (v1.1)
+# CSV Preprocessor — README
 
-**Status:** v1.1
+**Status:** v1.2
 
 ---
 
@@ -20,53 +20,6 @@ Fluxo geral:
 5. Backend salva o `config.json` do job e enfileira no Redis.
 6. Worker consome a fila, executa o pipeline e gera `output.csv`.
 7. Frontend exibe gráficos via `POST /generate_chart` e libera o download via `GET /download_csv/{job_id}`.
-
----
-
-## O que mudou da v1.0 para a v1.1
-
-### Frontend (novo)
-
-A v1.0 não possuía interface gráfica funcional. A v1.1 introduz uma aplicação Next.js completa com:
-
-- **Upload com drag-and-drop** — zona de drop com validação de `.csv`, prévia do nome e tamanho do arquivo, e feedback visual de sucesso/erro.
-- **Prévia do CSV com seleção de colunas** — exibe as primeiras linhas do arquivo diretamente no browser (parse client-side) e permite selecionar quais colunas serão incluídas no pipeline.
-- **Pipeline builder visual** — cards interativos por etapa (Loader, Cleaner, TypeCaster, Encoder, Scaler) com toggle de ativação e configuração inline. As etapas podem ser reordenadas via drag-and-drop, e um resumo do fluxo (`loader → cleaner → encoder → scaler`) é exibido em tempo real.
-- **Painel de gráficos** — aba Charts integrada à página principal; consome o endpoint `/generate_chart` e renderiza visualizações Plotly com seleção de colunas X/Y.
-- **Separação de upload e execução do pipeline** — na v1.0 o pipeline era disparado junto ao upload. Na v1.1 o upload é independente e o pipeline roda em uma etapa separada, permitindo iterar sobre a configuração sem re-enviar o arquivo.
-
-### Backend (novos endpoints e engine)
-
-| Endpoint | v1.0 | v1.1 |
-|---|---|---|
-| `POST /upload` | Upload + enfileiramento imediato | Upload apenas (salva `input.csv`, status `uploaded`) |
-| `POST /run_pipeline/{job_id}` | — | Recebe config JSON, salva `config.json`, enfileira o job |
-| `POST /generate_chart` | — | Retorna dados Plotly para visualização de colunas |
-| `GET /jobs/{job_id}` | Retorna status | Retorna status + mensagem de erro (se houver `error.txt`) |
-| `GET /download_csv/{job_id}` | Disponível | Mantido |
-| `GET /ping` | Mantido | Mantido |
-
-### Engine (novos steps e estratégias)
-
-**Cleaner** — na v1.0 havia limpeza básica. A v1.1 adiciona quatro estratégias explícitas de imputação de nulos e remoção de duplicatas:
-
-- `DuplicateCleaner` — remove linhas duplicadas.
-- `ConstantCleaner` — preenche nulos com um valor fixo.
-- `ModeCleaner` — preenche nulos com a moda da coluna.
-- `MeanCleaner` — preenche nulos com a média (colunas numéricas).
-- `MedianCleaner` — preenche nulos com a mediana (colunas numéricas).
-
-**TypeCaster** — step novo. Converte colunas para tipos explícitos (`int`, `float`, `string`, `bool`, `datetime`) usando um schema configurado pelo usuário na UI.
-
-**Encoder** — adiciona dois novos encoders além do básico:
-
-- `OrdinalEncoder` — mapeia categorias a inteiros segundo uma ordem definida pelo usuário.
-- `LabelEncoder` — mapeia valores únicos automaticamente a inteiros sequenciais.
-- `OneHotEncoder` — mantido da v1.0, com correção de alinhamento de colunas entre fit e transform.
-
-**Scaler** — adiciona `RobustScaler` (usa mediana e IQR, resistente a outliers) além de `StandardScaler` e `MinMaxScaler`.
-
-**Pipeline** — agora suporta `typecaster` como step nomeado. Todos os steps respeitam a chave `order` no config, permitindo pipelines em qualquer sequência.
 
 ---
 
@@ -306,6 +259,12 @@ Tipos suportados: `int`, `float`, `string`, `bool`, `datetime`.
 ---
 
 ## Changelog
+
+### v1.2
+
+- Exportação do CSV processado
+- Exportação do pipeline em JSON
+- Adição de um switch que possibilita ver preview do CSV processado
 
 ### v1.1
 
