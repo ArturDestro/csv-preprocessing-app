@@ -1,4 +1,4 @@
-# CSV Preprocessor — README (v1.1)
+# CSV Preprocessor — README
 
 **Status:** v1.2
 
