@@ -22,15 +22,19 @@ export default function Home() {
     setJobId(id)
     setColumns(cols)
     setPreviewRows(rows)
-    setSelectedColumns(cols) // select all by default
+    setSelectedColumns(cols)
   }
 
   const activeColumns = selectedColumns.length > 0 ? selectedColumns : columns
 
   const tabs: { value: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
     { value: "pipeline", label: "Pipeline", Icon: Database },
-    { value: "charts", label: "Charts", Icon: BarChart2 },
+    { value: "charts",   label: "Charts",   Icon: BarChart2 },
   ]
+
+  const maxWidth = activeTab === "pipeline" && previewRows.length > 0
+    ? "max-w-7xl"
+    : "max-w-3xl"
 
   return (
     <div className="min-h-screen bg-background font-sans">
@@ -44,13 +48,11 @@ export default function Home() {
             CSV Preprocessor
           </span>
         </div>
-
         {jobId && (
           <div className="flex items-center gap-2">
             <CheckCircle className="h-3.5 w-3.5 text-chart-2" />
             <span className="font-mono text-xs text-muted-foreground">
-              job_id:{" "}
-              <span className="text-chart-2">{jobId.slice(0, 8)}…</span>
+              job_id: <span className="text-chart-2">{jobId.slice(0, 8)}…</span>
             </span>
             <Badge variant="secondary" className="font-mono text-xs">
               {selectedColumns.length}/{columns.length} col{columns.length !== 1 ? "s" : ""}
@@ -59,8 +61,8 @@ export default function Home() {
         )}
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
-        {/* Upload section */}
+      <main className={cn("mx-auto px-4 py-8 space-y-6 transition-all duration-300", maxWidth)}>
+        {/* 1. Upload */}
         <section aria-label="File upload">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">
             1. Upload CSV
@@ -68,7 +70,7 @@ export default function Home() {
           <CsvUploader onUploadSuccess={handleUploadSuccess} />
         </section>
 
-        {/* Preview section — shown once a file is uploaded */}
+        {/* 2. Preview & Select Columns */}
         {columns.length > 0 && previewRows.length > 0 && (
           <section aria-label="CSV preview and column selection">
             <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-3">
@@ -83,25 +85,19 @@ export default function Home() {
           </section>
         )}
 
-        {/* Tabs */}
+        {/* 3. Transform & Visualize */}
         <section aria-label="Pipeline and charts" className="space-y-4">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
             {columns.length > 0 ? "3." : "2."} Transform &amp; Visualize
           </h2>
 
           {/* Tab switcher */}
-          <div
-            role="tablist"
-            aria-label="Workspace tabs"
-            className="flex gap-1 p-1 rounded-lg bg-muted/60 border border-border"
-          >
+          <div role="tablist" className="flex gap-1 p-1 rounded-lg bg-muted/60 border border-border">
             {tabs.map(({ value, label, Icon }) => (
               <button
                 key={value}
                 role="tab"
                 aria-selected={activeTab === value}
-                aria-controls={`tabpanel-${value}`}
-                id={`tab-${value}`}
                 onClick={() => setActiveTab(value)}
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 rounded-md py-2 text-sm font-medium transition-all",
@@ -116,27 +112,18 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Tab panels */}
-          <div
-            id="tabpanel-pipeline"
-            role="tabpanel"
-            aria-labelledby="tab-pipeline"
-            hidden={activeTab !== "pipeline"}
-          >
-            {activeTab === "pipeline" && (
-              <PipelinePanel jobId={jobId} columns={activeColumns} />
-            )}
+          {/* Pipeline tab — always mounted, just hidden */}
+          <div hidden={activeTab !== "pipeline"}>
+            <PipelinePanel
+              jobId={jobId}
+              columns={activeColumns}
+              previewRows={previewRows}
+            />
           </div>
 
-          <div
-            id="tabpanel-charts"
-            role="tabpanel"
-            aria-labelledby="tab-charts"
-            hidden={activeTab !== "charts"}
-          >
-            {activeTab === "charts" && (
-              <ChartPanel jobId={jobId} columns={activeColumns} previewRows={previewRows} />
-            )}
+          {/* Charts tab — always mounted, just hidden */}
+          <div hidden={activeTab !== "charts"}>
+            <ChartPanel jobId={jobId} columns={activeColumns} previewRows={previewRows} />
           </div>
         </section>
       </main>
